@@ -58,7 +58,7 @@ class BrowserContent:
 
     def list_heading_tags(self):
         h_tag_count = 1
-        ## 取得該網站的html有幾個heading tag（h1. h2, h3....）##
+        ## 取得該網站的html有幾個heading tag（h1, h2, h3..., h6）##
         while h_tag_count <= 6:
             try:
                 self.find_elements(by=By.TAG_NAME, value=f'h{h_tag_count}')
@@ -81,11 +81,10 @@ class BrowserContent:
 
 class ElasticClient:
     """
-    Singleton Class. Only one instance will be created. 
+    A rough implementation of a Singleton Class. Only one instance will be created throughout runtime.. 
     """
     __elastic_con = None
     __es_lock = threading.Lock()
-    __map = None
 
     @staticmethod
     def get_instance(map):
@@ -93,12 +92,11 @@ class ElasticClient:
             with ElasticClient.__es_lock:
                 ElasticClient.__elastic_con = Elasticsearch(cloud_id=config['ELASTIC']['cloud_id'],
                                                             http_auth=(config['ELASTIC']['user'], config['ELASTIC']['password']))
-                ElasticClient.__map = map
         return ElasticClient.__elastic_con
 
     def __init__(self):
         raise Exception("This class is Singleton. Use get_instance()")
 
-    def __create_index(self, index_name):
-        self.elastic_con.indices.create(
-            index=index_name, ignore=400, body=self.map_body)
+    # def __create_index(self, index_name):
+    #     self.elastic_con.indices.create(
+    #         index=index_name, ignore=400, body=self.map_body)
