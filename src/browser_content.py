@@ -1,13 +1,15 @@
 from selenium.webdriver.support.select import By
-from elasticsearch import Elasticsearch
+from opensearchpy import OpenSearch, RequestsHttpConnection
 import configparser
 import threading
+from abc import ABC, abstractmethod
+import typing
+from base64 import b64decode
+import os
+import json
 
-
-url = "https://www.dragonsteel.com.tw/"
 config = configparser.ConfigParser()
 config.read('es_credentials.ini', encoding='utf-8')
-dictionary = {}
 
 
 class BrowserContent:
@@ -81,22 +83,74 @@ class BrowserContent:
 
 class ElasticClient:
     """
-    A rough implementation of a Singleton Class. Only one instance will be created throughout runtime.. 
+    A rough implementation of a Singleton Class. Only one instance will be created throughout runtime..
     """
     __elastic_con = None
     __es_lock = threading.Lock()
 
     @staticmethod
-    def get_instance(map):
+    def get_instance():
         if ElasticClient.__elastic_con is None:
             with ElasticClient.__es_lock:
-                ElasticClient.__elastic_con = Elasticsearch(cloud_id=config['ELASTIC']['cloud_id'],
-                                                            http_auth=(config['ELASTIC']['user'], config['ELASTIC']['password']))
+                ElasticClient.__elastic_con = OpenSearch(hosts=[{'host': '10.11.233.105', 'port': 9200}],
+                                                         http_auth=(
+                                                             config['ELASTIC']['user'], config['ELASTIC']['password']),
+                                                         use_ssl=True,
+                                                         verify_certs=False,
+                                                         ssl_assert_hostname=False,
+                                                         ssl_show_warn=False,
+                                                         connection_class=RequestsHttpConnection)
         return ElasticClient.__elastic_con
 
     def __init__(self):
         raise Exception("This class is Singleton. Use get_instance()")
 
-    # def __create_index(self, index_name):
-    #     self.elastic_con.indices.create(
-    #         index=index_name, ignore=400, body=self.map_body)
+
+class Saver(ABC):
+    @ abstractmethod
+    def save():
+        pass
+
+
+class SaveAsPDF(Saver):
+    def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
+        self.browser_content = browser_content
+        self.path = path
+        self.filename = filename
+        self.browser_content.browser_init()
+
+    def save(self) -> typing.BinaryIO:
+        pdf = b64decode(self.browser_content.print_page())
+        with open(os.path.join(self.path, self.filename), 'wb') as f:
+            f.write(pdf)
+            return f
+
+    def get_pdf_2b_saved(self) -> typing.BinaryIO:
+        pass
+
+
+class SaveAsPlainText(Saver):
+    def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
+        self.browser_content = browser_content
+        self.path = path
+        self.filename = filename
+        self.browser_content.browser_init()
+
+    def get_text_2b_saved(self) -> typing.Dict:
+        dict = {}
+        dict['title'] = self.browser_content.list_title()
+        dict['meta-content'] = list(self.browser_content.list_meta_contents())
+        dict['class'] = list(self.browser_content.list_classes())
+        dict['id'] = list(self.browser_content.list_ids())
+        dict['heading-tag'] = list(self.browser_content.list_heading_tags())
+        dict['paragraph-tag'] = list(
+            self.browser_content.list_paragraph_tags())
+        dict['hyperlink'] = list(self.browser_content.list_hyperlinks())
+        dict['whole-html'] = self.browser_content.list_whole_html()
+        return dict
+
+    def save(self) -> typing.IO:
+        dict = self.get_text_2b_saved()
+        with open(os.path.join(self.path, self.filename), 'w+', encoding='utf-8') as f:
+            json.dump(dict, f, ensure_ascii=False)
+            return f
