@@ -5,10 +5,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from pprint import pprint
 from click import command, option, argument, Option, UsageError
-from datetime import date
 import typing
 import os
 import ast
+import json
+import requests
 
 
 map = {
@@ -104,7 +105,10 @@ def check(save2local, compare2local, urls, write2es):
                 with open(os.path.join(build_dir, f'{url.replace("/", "")}.txt'), 'r', encoding='utf-8') as f:
                     dict1 = ast.literal_eval(f.read())
                     dict2 = s.get_text_2b_saved()
-                    diff = {k: dict2[k] for k in set(dict2) - set(dict1)}
+                    diff = {}
+                    diffkeys = [k for k in dict1 if dict1[k] != dict2[k]]
+                    for k in diffkeys:
+                        diff[k] = list(set(dict1[k]) ^ set(dict2[k]))
                     if len(diff) != 0:
                         print("The following keys have changed: " +
                               str(diff.keys()))
@@ -114,19 +118,22 @@ def check(save2local, compare2local, urls, write2es):
                             "Nothing on the web has changed. Nothing will be written to the database.")
                         return
                     if write2es:
-                        write2db(diff=diff, url=url)
+                        write2db(diff=diff)
             else:
                 raise FileNotFoundError('File Not Found.')
 
 
-def write2db(diff: typing.Dict[str, str], url: str):
+def write2db(diff: typing.Dict[str, str]):
+
     es = browser_content.ElasticClient.get_instance()
     if not es.ping:
         raise ValueError("Connection Failed.")
     es.indices.create(
-        index=f'web_diff-{url.replace("/", "")}-{date.today().isoformat()}', ignore=400, body=map)
+        index='test', ignore=400, body=map)
     es.index(
-        index=f'web_diff-{url.replace("/", "")}-{date.today().isoformat()}', body=diff)
+        index='test', body=json.dumps(diff))
+    resp = es.search(index='test')
+    print(resp)
 
 
 if __name__ == '__main__':

@@ -7,6 +7,7 @@ import typing
 from base64 import b64decode
 import os
 import json
+from datetime import datetime, timezone
 
 config = configparser.ConfigParser()
 config.read('es_credentials.ini', encoding='utf-8')
@@ -147,6 +148,7 @@ class SaveAsPlainText(Saver):
             self.browser_content.list_paragraph_tags())
         dict['hyperlink'] = list(self.browser_content.list_hyperlinks())
         dict['whole-html'] = self.browser_content.list_whole_html()
+        dict['timestamp'] = datetime.now(timezone.utc).isoformat()
         return dict
 
     def save(self) -> typing.IO:
