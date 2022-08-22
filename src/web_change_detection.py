@@ -9,7 +9,6 @@ import typing
 import os
 import ast
 import json
-import requests
 
 
 map = {
@@ -106,7 +105,8 @@ def check(save2local, compare2local, urls, write2es):
                     dict1 = ast.literal_eval(f.read())
                     dict2 = s.get_text_2b_saved()
                     diff = {}
-                    diffkeys = [k for k in dict1 if dict1[k] != dict2[k]]
+                    diffkeys = [k for k in dict1 if dict1.get(k)
+                                != dict2.get(k) and k != "timestamp"]
                     for k in diffkeys:
                         diff[k] = list(set(dict1[k]) ^ set(dict2[k]))
                     if len(diff) != 0:
@@ -129,11 +129,9 @@ def write2db(diff: typing.Dict[str, str]):
     if not es.ping:
         raise ValueError("Connection Failed.")
     es.indices.create(
-        index='test', ignore=400, body=map)
+        index='web-change-log', ignore=400, body=map)
     es.index(
-        index='test', body=json.dumps(diff))
-    resp = es.search(index='test')
-    print(resp)
+        index='web-change-log', body=json.dumps(diff))
 
 
 if __name__ == '__main__':

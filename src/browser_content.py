@@ -31,7 +31,7 @@ class BrowserContent:
         return page
 
     def list_title(self):
-        return self.title
+        return self.title.split(" ")
 
     def list_ids(self):
         for id in self.find_elements(by=By.XPATH, value='//*[@id]'):
@@ -139,7 +139,7 @@ class SaveAsPlainText(Saver):
 
     def get_text_2b_saved(self) -> typing.Dict:
         dict = {}
-        dict['title'] = self.browser_content.list_title()
+        dict['title'] = list(self.browser_content.list_title())
         dict['meta-content'] = list(self.browser_content.list_meta_contents())
         dict['class'] = list(self.browser_content.list_classes())
         dict['id'] = list(self.browser_content.list_ids())
