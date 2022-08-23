@@ -10,6 +10,7 @@ import typing
 import os
 import ast
 import json
+import re
 from datetime import datetime, timezone
 
 
@@ -100,7 +101,7 @@ class MutuallyExclusiveOption(Option):
 @ command()
 @ option('-s', '--save_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並存取該網站HTML到本地資料夾', mutually_exclusive=['compare2local', 'write2es'])
 @ option('-c', '--compare_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並與本地的對應資料比對該網站HTML有無更新', mutually_exclusive=['save2local'])
-@ option('-a', '--compare_tag', is_flag=True)
+@ option('-a', '--compare_tag', is_flag=True, help='輸入網站URL，將與本地對應資料進行HTML標籤比對')
 @ option('-i', '--compare_hash', is_flag=True)
 @ option('-w', '--write2es', is_flag=True, cls=MutuallyExclusiveOption, help='將比對不同之處上傳至OpenSearch資料庫', mutually_exclusive=['save2local'])
 @ option('-t', '--specify_tag', type=str, multiple=True)
@@ -202,6 +203,14 @@ def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
         index='web-change-log', ignore=400, body=map)
     es.index(
         index='web-change-log', body=json.dumps(diff))
+
+
+def convertHtml2Xpath(html: str):
+    html.replace("<", "")
+    html.replace(">", "")
+    xpath = re.search("([\w\s]+)=([\w\s\"]+)", html)
+    tag = xpath[1]
+    attribute = xpath[2]
 
 
 if __name__ == '__main__':
