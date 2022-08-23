@@ -2,12 +2,13 @@ from selenium.webdriver.support.select import By
 from opensearchpy import OpenSearch, RequestsHttpConnection
 import configparser
 import threading
+import hashlib
 from abc import ABC, abstractmethod
 import typing
 from base64 import b64decode
 import os
 import json
-from datetime import datetime, timezone
+
 
 config = configparser.ConfigParser()
 config.read('es_credentials.ini', encoding='utf-8')
@@ -84,7 +85,7 @@ class BrowserContent:
 
 class ElasticClient:
     """
-    A rough implementation of a Singleton Class. Only one instance will be created throughout runtime..
+    A rough implementation of a Singleton Class. Only one instance will be created throughout runtime.
     """
     __elastic_con = None
     __es_lock = threading.Lock()
@@ -109,16 +110,19 @@ class ElasticClient:
 
 class Saver(ABC):
     @ abstractmethod
+    def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
+        self.browser_content = browser_content
+        self.path = path
+        self.filename = filename
+        self.browser_content.browser_init()
+
     def save():
         pass
 
 
 class SaveAsPDF(Saver):
     def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
-        self.browser_content = browser_content
-        self.path = path
-        self.filename = filename
-        self.browser_content.browser_init()
+        super().__init__(path, filename, browser_content)
 
     def save(self) -> typing.BinaryIO:
         pdf = b64decode(self.browser_content.print_page())
@@ -126,16 +130,10 @@ class SaveAsPDF(Saver):
             f.write(pdf)
             return f
 
-    def get_pdf_2b_saved(self) -> typing.BinaryIO:
-        pass
 
-
-class SaveAsPlainText(Saver):
+class SaveTagsAsPlainText(Saver):
     def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
-        self.browser_content = browser_content
-        self.path = path
-        self.filename = filename
-        self.browser_content.browser_init()
+        super().__init__(path, filename, browser_content)
 
     def get_text_2b_saved(self) -> typing.Dict:
         dict = {}
@@ -147,8 +145,6 @@ class SaveAsPlainText(Saver):
         dict['paragraph-tag'] = list(
             self.browser_content.list_paragraph_tags())
         dict['hyperlink'] = list(self.browser_content.list_hyperlinks())
-        dict['whole-html'] = self.browser_content.list_whole_html()
-        dict['timestamp'] = datetime.now(timezone.utc).isoformat()
         return dict
 
     def save(self) -> typing.IO:
@@ -156,3 +152,32 @@ class SaveAsPlainText(Saver):
         with open(os.path.join(self.path, self.filename), 'w+', encoding='utf-8') as f:
             json.dump(dict, f, ensure_ascii=False)
             return f
+
+
+class SaveHTMLAsHash(Saver):
+    def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
+        super().__init__(path, filename, browser_content)
+
+    def get_hash_2b_saved(self):
+        h = hashlib.new('sha256')
+        h.update(bytes(self.browser_content.list_whole_html(), 'utf-8'))
+        return h
+
+    def save(self) -> typing.IO:
+        h = self.get_hash_2b_saved()
+        with open(os.path.join(self.path, self.filename), 'w+', encoding='utf-8') as f:
+            f.write(h.hexdigest())
+            return f
+
+
+class SaveHTMLAsPlainText(Saver):
+    def __init__(self, path: str, filename: str, browser_content: typing.Type[BrowserContent]):
+        super().__init__(path, filename, browser_content)
+
+    def save(self) -> typing.IO:
+        with open(os.path.join(self.path, self.filename), 'w+', encoding='utf-8') as f:
+            f.write(self.get_html_2b_saved())
+            return f
+
+    def get_html_2b_saved(self):
+        return self.browser_content.list_whole_html()
