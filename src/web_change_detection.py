@@ -199,16 +199,16 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
             for tag in list(specify_tag2bcompared):
                 new = convertHtml2Xpath(tag, url)
                 local = locateHTML(tag, os.path.join(path, 'html.txt'))
-            print(new)
-            print(local)
-            for n, l in zip(new, local):
-                for index, s in enumerate(difflib.ndiff(l, n)):
-                    if s[0] == ' ':
-                        continue
-                    elif s[0] == '被':
-                        print(f'Delete "{s[-1]}" from position {index}')
-                    elif s[0] == '新':
-                        print(f'Add "{s[-1]}" to position {index}')
+                print(new)
+                print(local)
+                for n, l in zip(new, local):
+                    for index, s in enumerate(difflib.ndiff(l, n)):
+                        if s[0] == ' ':
+                            continue
+                        elif s[0] == '被':
+                            print(f'Delete "{s[-1]}" from position {index}')
+                        elif s[0] == '新':
+                            print(f'Add "{s[-1]}" to position {index}')
 
 
 def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
