@@ -199,16 +199,17 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
             for tag in list(specify_tag2bcompared):
                 new = convertHtml2Xpath(tag, url)
                 local = locateHTML(tag, os.path.join(path, 'html.txt'))
-                print(new)
-                print(local)
-                for n, l in zip(new, local):
-                    for index, s in enumerate(difflib.ndiff(l, n)):
-                        if s[0] == ' ':
-                            continue
-                        elif s[0] == '被':
-                            print(f'Delete "{s[-1]}" from position {index}')
-                        elif s[0] == '新':
-                            print(f'Add "{s[-1]}" to position {index}')
+                pprint(new)
+                print("\n\n\n")
+                pprint(local)
+                # for n, l in zip(new, local):
+                #     for index, s in enumerate(difflib.ndiff(l, n)):
+                #         if s[0] == ' ':
+                #             continue
+                #         elif s[0] == '被':
+                #             print(f'Delete "{s[-1]}" from position {index}')
+                #         elif s[0] == '新':
+                #             print(f'Add "{s[-1]}" to position {index}')
 
 
 def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
@@ -259,13 +260,15 @@ def convertHtml2Xpath(html: str, URL: str):
         print("Cannot find Element. Please make sure you entered the correct format HTML.")
     else:
         for element in elements:
-            results.append(element.get_attribute('innerHTML'))
+            results.append(element.get_attribute('innerHTML').strip("\n"))
     return results
 
 
 def locateHTML(html_substring_2b_located: str, path: str):
-    print("hello" + html_substring_2b_located)
-    html_substring_2b_located.replace("\'", "")
+    # String Pre-processing. Adding necessary "brackets <>" or replacing single quotes with double quotes.
+    if re.search("^\s*?[\w<>/]", html_substring_2b_located)[0].strip() != "<":
+        html_substring_2b_located = "<" + html_substring_2b_located + ">"
+    html_substring_2b_located = html_substring_2b_located.replace("\'", "\"")
     with open(path, mode='r', encoding='utf-8') as f:
         whole_html = f.read()
     l = [m.start() + len(html_substring_2b_located) for m in re.finditer(
@@ -311,7 +314,7 @@ def locateHTML(html_substring_2b_located: str, path: str):
                 break
 
         compare = new_new[:indicies_being_traversed+1]
-        results.append(compare)
+        results.append(compare.strip("\n"))
         # yield compare
     return results
 
