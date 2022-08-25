@@ -224,7 +224,7 @@ def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
 
 
 def convertHtml2Xpath(html: str, URL: str):
-    xpath = re.findall("([\w].+?)=\s*?[\"+\']([\w+/].+?)[\"+\']", html)
+    xpath = re.findall("([\w].+?)=\s*?[\"\']([\w/].+?)[\"\']", html)
     xpath_is_specified = False
     tags = []
     attributes = []
