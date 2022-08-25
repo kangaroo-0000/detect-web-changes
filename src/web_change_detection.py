@@ -102,16 +102,16 @@ class MutuallyExclusiveOption(Option):
 
 
 @ command()
-@ option('-s', '--save_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並存取該網站HTML到本地資料夾', mutually_exclusive=['compare2local', 'write2es'])
-@ option('-c', '--compare_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並與本地的對應資料比對該網站HTML有無更新', mutually_exclusive=['save2local'])
-@ option('-a', '--compare_tag', is_flag=True, help='輸入網站URL，將與本地對應資料進行HTML標籤比對')
-@ option('-i', '--compare_hash', is_flag=True)
-@ option('-w', '--write2es', is_flag=True, cls=MutuallyExclusiveOption, help='將比對不同之處上傳至OpenSearch資料庫', mutually_exclusive=['save2local'])
-@ option('-t', '--specify_tag2bcompared', type=str, multiple=True)
-@ option('-o', '--save_tags', is_flag=True, cls=MutuallyExclusiveOption, help='存取該網站較重要標籤', mutually_exclusive=['compare2local', 'write2es', 'specify_tag'])
-@ option('-h', '--hash_html', is_flag=True, help='對HTML進行哈希算法並存取之')
+@ option('-c', '--compare_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並與本地的對應資料比對該網站HTML有無更新', mutually_exclusive=['save_html', 'save_tag', 'save_hash'])
+@ option('-a', '--compare_tag', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，將與本地對應資料進行HTML標籤比對', mutually_exclusive=['save_html', 'save_tag', 'save_hash'])
+@ option('-i', '--compare_hash', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，將與本地對應哈希碼進行比對', mutually_exclusive=['save_html', 'save_tag', 'save_hash'])
+@ option('-w', '--write2es', is_flag=True, cls=MutuallyExclusiveOption, help='將比對不同之處上傳至OpenSearch資料庫', mutually_exclusive=['save_html', 'save_tag', 'save_hash'])
+@ option('-t', '--specify_tag2bcompared', type=str, multiple=True, help='請輸入正確HTML格式。範例： -t \"<li class=\'dropdown m-menu-fw\' data-nav=\'cd-nav\'>\" 如要輸入多筆標籤請依次於標籤前加上 -t。範例： -t \"<div class=\'item\'>\" -t \"<h1 class=\'wow bounceInLeft\'>\" 如需於標籤內輸入雙引號\"\"，請於引號前加反斜線。範例：\\\"')
+@ option('-s', '--save_html', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，並存取該網站HTML到本地資料夾', mutually_exclusive=['compare_html', 'comapre_tag', 'compare_hash' 'write2es'])
+@ option('-o', '--save_tags', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，存取該HTML較重要標籤', mutually_exclusive=['compare_html', 'comapre_tag', 'compare_hash', 'write2es'])
+@ option('-h', '--save_hash', is_flag=True, cls=MutuallyExclusiveOption, help='輸入網站URL，將雜湊其HTML並存取之', mutually_exclusive=['compare_html', 'comapre_tag', 'compare_hash', 'write2es'])
 @ argument('urls', nargs=-1)
-def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcompared, hash_html, save_tags, compare_hash):
+def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcompared, save_hash, save_tags, compare_hash):
     for url in urls:
         new = browser_content.BrowserContent(
             browser=browser, url=url)
@@ -126,7 +126,7 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
             st = browser_content.SaveTagsAsPlainText(
                 path=path, filename='tags.txt', browser_content=new)
             st.save()
-        if hash_html:
+        if save_hash:
             sh = browser_content.SaveHTMLAsHash(
                 path=path, filename='hash.txt', browser_content=new)
             sh.save()
@@ -137,7 +137,6 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
                 with open(os.path.join(path, 'html.txt'), 'r', encoding='utf-8') as f:
                     original = f.read()
                     new_html = s.get_html_2b_saved()
-                    print(new_html)
                     for index, s in enumerate(difflib.ndiff(original, new_html)):
                         if s[0] == ' ':
                             continue
@@ -149,9 +148,14 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
                         html_diff = {}
                         html_diff["whole-html"] = [l for l in difflib.ndiff(
                             original, new_html) if not l.startswith(" ")]
-                        html_diff["@timestamp"] = datetime.now(
-                            timezone.utc).isoformat()
-                        write2db(diff=html_diff)
+                        if len(html_diff["whole-html"]) != 0:
+                            html_diff["@timestamp"] = datetime.now(
+                                timezone.utc).isoformat()
+                            write2db(diff=html_diff)
+                        else:
+                            print(
+                            "Nothing on the web has changed. Nothing will be written to the database.")
+                            return
 
             else:
                 raise FileNotFoundError('本地資料尚無此網站檔案。請先進行網站資料存取再進行比對。')
@@ -188,11 +192,16 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
                 with open(os.path.join(path, 'hash.txt'), 'r', encoding='utf-8') as f:
                     if f.read() == sh.get_hash_2b_saved():
                         print(
-                            "Hash remains the same. No changes had taken place on this web.")
+                            "Hash remains the same. No changes had taken place on this web. Nothing will be uploaded to database.")
                     else:
                         print("Hash changed!")
-                        print(f'New Hash: {sh.get_hash_2b_saved}')
+                        print(f'New Hash: {sh.get_hash_2b_saved()}')
                         print(f'Old Hash: {f.read()}')
+                        if write2es:
+                            hash = {}
+                            hash["hash"] = sh.get_hash_2b_saved()
+                            hash["@timestamp"] = datetime.now(timezone.utc).isoformat()
+                            write2db(diff=hash)
         if specify_tag2bcompared:
             new = []
             local = []
@@ -210,6 +219,18 @@ def check(save_html, compare_html, compare_tag, urls, write2es, specify_tag2bcom
                             print(f'Delete "{s[-1]}" from position {index}')
                         elif s[0] == '新':
                             print(f'Add "{s[-1]}" to position {index}')
+                if write2es:
+                    tag_diff = {}
+                    html_diff["specified-tags"] = [l for l in difflib.ndiff(
+                        original, new_html) if not l.startswith(" ")]
+                    if len(html_diff["specified-tags"]) != 0:
+                        html_diff["@timestamp"] = datetime.now(
+                            timezone.utc).isoformat()
+                        write2db(diff=html_diff)
+                    else:
+                        print(
+                        "Nothing on the web has changed. Nothing will be written to the database.")
+                        return
 
 
 def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
@@ -224,6 +245,7 @@ def write2db(diff: typing.Union[typing.Dict[str, str], typing.List[str]]):
 
 
 def convertHtml2Xpath(html: str, URL: str):
+    html = html.replace('"', "'")
     xpath = re.findall("([\w].+?)=\s*?[\"\']([\w/].+?)[\"\']", html)
     xpath_is_specified = False
     tags = []
@@ -253,6 +275,7 @@ def convertHtml2Xpath(html: str, URL: str):
             search = search + (f'[@{tags[i]}=\'{attributes[i]}\']')
     else:
         raise Exception("Wrong HTML format.")
+    print(f'XPATH is: {search}')
     browser.get(URL)
     try:
         elements = browser.find_elements(by=By.XPATH, value=search)
@@ -260,17 +283,22 @@ def convertHtml2Xpath(html: str, URL: str):
         print("Cannot find Element. Please make sure you entered the correct format HTML.")
     else:
         for element in elements:
-            results.append(element.get_attribute('innerHTML').strip())
+            result = element.get_attribute('innerHTML').strip()
+            result = re.sub('<!--([\w\W]*?)-->','', result)
+            results.append(result)
     return results
 
 
 def locateHTML(html_substring_2b_located: str, path: str):
-    # String Pre-processing. Adding necessary "brackets <>" or replacing single quotes with double quotes.
+    # String Pre-processing. Adding necessary "brackets <>", stripping whitespaces before/after the '=' sign,
+    # getting rid of comment tags <!>, or replacing single quotes with double quotes.
     if re.search("^\s*?[\w<>/]", html_substring_2b_located)[0].strip() != "<":
         html_substring_2b_located = "<" + html_substring_2b_located + ">"
+    html_substring_2b_located = re.sub('(\s*?)=(\s*)', "=", html_substring_2b_located)
     html_substring_2b_located = html_substring_2b_located.replace("\'", "\"")
     with open(path, mode='r', encoding='utf-8') as f:
         whole_html = f.read()
+    whole_html = re.sub('<!--([\w\W]*?)-->','', whole_html)
     l = [m.start() + len(html_substring_2b_located) for m in re.finditer(
         re.escape(html_substring_2b_located), whole_html)]
     results = []
@@ -294,10 +322,12 @@ def locateHTML(html_substring_2b_located: str, path: str):
                 break
         # new_new is the slice containing the substring that is being compared to.
         new_new = new[space_count+1:]
-        space = 0
         indicies_being_traversed = 0
+        space = 0
+        line_count = 0
         for i in range(len(new_new)):
             if new_new[i] == '\n':
+                # line = line + 1
                 space = 0
                 continue
             if new_new[i] == ' ':
@@ -309,7 +339,7 @@ def locateHTML(html_substring_2b_located: str, path: str):
                 continue
 
         for i in range(indicies_being_traversed, len(new_new)):
-            if new_new[i] == '>':
+            if new_new[i+1] == '\n':
                 indicies_being_traversed = i
                 break
 
